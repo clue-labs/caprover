@@ -41,6 +41,7 @@ import dockerodeUtils = require('dockerode/lib/util')
 
 const Base64 = Base64Provider.Base64
 const CAPROVER_MANAGED_SERVICE_LABEL = 'com.caprover.managed'
+const SWARM_TASK_ID_LABEL = 'com.docker.swarm.task.id'
 
 export abstract class IDockerUpdateOrders {
     public static readonly AUTO = 'auto'
@@ -1767,8 +1768,14 @@ class DockerApi {
         Logger.d('Pruning containers...')
 
         const self = this
+        // Leave stopped Swarm task containers alone, Swarm keeps the last few per slot
+        // (`docker swarm update --task-history-limit`) so their logs stay available.
         return self.dockerode
-            .pruneContainers() //
+            .pruneContainers({
+                filters: {
+                    'label!': [SWARM_TASK_ID_LABEL],
+                },
+            })
             .catch(function (error) {
                 // Error: (HTTP code 409) unexpected - a prune operation is already running
                 if (error && error.statusCode === 409) {
